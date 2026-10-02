@@ -44,6 +44,50 @@ jobs:
         working-directory: mobile
         run: pnpm test
 
+  android-apk:
+    name: Android installable test APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@v3
+        with:
+          version: 11.25.0
+          runtime: node@24
+          working-directory: mobile
+          cache: true
+          cache-dependency-path: mobile/pnpm-lock.yaml
+          install: false
+
+      - name: Install locked dependencies
+        working-directory: mobile
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate the Android project
+        working-directory: mobile
+        run: pnpm exec expo prebuild --platform android --no-install
+
+      - name: Build installable debug APK
+        working-directory: mobile/android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: onboard-engine-android-apk
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
   dashboard:
     name: Dashboard checks
     runs-on: ubuntu-latest
