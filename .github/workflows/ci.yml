@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mobile:
+    name: Mobile checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@v3
+        with:
+          version: 11.25.0
+          runtime: node@24
+          working-directory: mobile
+          cache: true
+          cache-dependency-path: mobile/pnpm-lock.yaml
+          install: false
+
+      - name: Install locked dependencies
+        working-directory: mobile
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        working-directory: mobile
+        run: pnpm run typecheck
+
+      - name: Run tests
+        working-directory: mobile
+        run: pnpm test
+
+  dashboard:
+    name: Dashboard checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js and pnpm
+        uses: pnpm/setup@v3
+        with:
+          version: 11.25.0
+          runtime: node@24
+          working-directory: dashboard
+          cache: true
+          cache-dependency-path: dashboard/pnpm-lock.yaml
+          install: false
+
+      - name: Install locked dependencies
+        working-directory: dashboard
+        run: pnpm install --frozen-lockfile
+
+      - name: Check safety/readiness states
+        working-directory: dashboard
+        run: pnpm run check:readiness
+
+      - name: Build dashboard
+        working-directory: dashboard
+        run: pnpm run build
+
+  backend:
+    name: Rust checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          components: clippy, rustfmt
+          rust-src-dir: backend
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path backend/Cargo.toml -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path backend/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run Rust tests
+        run: cargo test --manifest-path backend/Cargo.toml
+
+  backend-e2e:
+    name: Backend API end-to-end smoke
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          rust-src-dir: backend
+
+      - name: Build local API
+        run: cargo build --release --manifest-path backend/Cargo.toml
+
+      - name: Start API and run end-to-end checks
+        shell: pwsh
+        env:
+          APP_ENV: local-demo
+          ONBOARD_ENGINE_BIND: 127.0.0.1:8080
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $apiPath = (Resolve-Path 'backend/target/release/relocation-engine-backend.exe').Path
+          $stdoutPath = Join-Path $env:RUNNER_TEMP 'onboard-engine-api.stdout.log'
+          $stderrPath = Join-Path $env:RUNNER_TEMP 'onboard-engine-api.stderr.log'
+          $server = Start-Process -FilePath $apiPath -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 60; $attempt++) {
+              if ($server.HasExited) { break }
+              try {
+                $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8080/health' -TimeoutSec 2
+                if ($health.status -eq 'ok') { $ready = $true; break }
+              } catch {
+                Start-Sleep -Seconds 1
+              }
+            }
+            if (-not $ready) {
+              if (Test-Path $stdoutPath) { Get-Content $stdoutPath }
+              if (Test-Path $stderrPath) { Get-Content $stderrPath }
+              throw 'The local API did not become healthy within 60 seconds.'
+            }
+            & ./scripts/e2e-api.ps1
+          } finally {
+            if (-not $server.HasExited) { Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue }
+          }

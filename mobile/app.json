@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Onboard Engine",
+    "slug": "onboard-engine-mobile",
+    "scheme": "onboardengine",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.onboardengine.mobile"
+    },
+    "android": {
+      "package": "com.onboardengine.mobile",
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "plugins": [
+      [
+        "expo-sqlite",
+        {
+          "useSQLCipher": true
+        }
+      ],
+      "expo-secure-store"
+    ]
+  }
+}
