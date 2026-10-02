@@ -1,0 +1,10 @@
+.git
+**/target
+**/node_modules
+.pnpm-store
+**/dist
+**/.expo
+**/.expo-shared
+**/.env
+**/.env.*
+mobile/android

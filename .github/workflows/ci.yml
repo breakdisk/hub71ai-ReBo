@@ -92,10 +92,10 @@ jobs:
         run: cargo fmt --manifest-path backend/Cargo.toml -- --check
 
       - name: Run Clippy
-        run: cargo clippy --manifest-path backend/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path backend/Cargo.toml --all-targets -- -D warnings
 
       - name: Run Rust tests
-        run: cargo test --manifest-path backend/Cargo.toml
+        run: cargo test --locked --manifest-path backend/Cargo.toml
 
   backend-e2e:
     name: Backend API end-to-end smoke
@@ -111,7 +111,7 @@ jobs:
           rust-src-dir: backend
 
       - name: Build local API
-        run: cargo build --release --manifest-path backend/Cargo.toml
+        run: cargo build --locked --release --manifest-path backend/Cargo.toml
 
       - name: Start API and run end-to-end checks
         shell: pwsh
@@ -144,3 +144,22 @@ jobs:
           } finally {
             if (-not $server.HasExited) { Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue }
           }
+
+  backend-docker:
+    name: Docker backend smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Build and start the Docker Compose backend
+        run: docker compose up --build --detach --wait --wait-timeout 180
+
+      - name: Run API end-to-end checks against the container
+        shell: pwsh
+        run: ./scripts/e2e-api.ps1 -BaseUrl http://127.0.0.1:8080
+
+      - name: Stop the Docker Compose backend
+        if: always()
+        run: docker compose down

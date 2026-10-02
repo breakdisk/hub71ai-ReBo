@@ -16,10 +16,12 @@ This repository is a simulation-ready prototype. Government, banking, travel, an
 
 See each project README for its run commands and configuration. The dashboard and mobile app default to `http://localhost:8080` for the backend.
 
-The next-stage scope for cultural integration, tax/gratuity, human escalation, utilities, and disaster recovery is documented in [ROADMAP.md](ROADMAP.md). These domains are not production integrations in this prototype.
+The five gap areas in [ROADMAP.md](ROADMAP.md) now have local prototype flows: optional soft-landing guidance, a consented travel and compensation evidence ledger, human case acknowledgment and resolution, lease and resident-approval gates for home readiness, and tabletop resilience reviews. Legal calculations remain unavailable without approved rulesets; utility adapters and regional failover remain unconfigured. The API is in-memory and loopback-only, and no production integrations or external actions are active.
 
 ## GitHub Actions
 
-Pull requests and pushes to `main` run the mobile type-check and tests, dashboard readiness checks and production build, Rust formatting/lint/unit checks, and a Windows-hosted API end-to-end smoke test. Dependabot checks GitHub Actions, Cargo, dashboard, and mobile dependencies weekly. Production deployment is not wired yet because a hosting target and deployment credentials/environment have not been selected.
+Pull requests and pushes to `main` run the mobile type-check and tests, dashboard readiness checks and production build, Rust formatting/lint/unit checks, and API end-to-end smoke tests on Windows and in Docker Compose. Dependabot checks GitHub Actions, Cargo, dashboard, and mobile dependencies weekly. A production deployment target and credentials have not been selected, so CI does not publish or deploy the service.
+
+The root `docker-compose.yml` is for local backend verification. It uses host networking so the backend can keep its loopback-only bind policy; on Docker Desktop, enable host networking if the container cannot start. The backend is an unauthenticated in-memory demo; do not attach a public domain until authentication and production storage are implemented.
 
 For a dashboard-only browser smoke check while Rust is unavailable, run `node scripts/dev-mock-api.mjs` in one terminal and `pnpm run dev` from `dashboard/` in another. This in-memory fixture binds to loopback, accepts synthetic test data only, and is not a replacement for the Rust API smoke test.

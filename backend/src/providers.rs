@@ -100,9 +100,14 @@ mod tests {
 
     #[test]
     fn mock_failure_tokens_are_stage_scoped() {
-        let local = MockProviders { failure_tokens_enabled: true };
+        let local = MockProviders {
+            failure_tokens_enabled: true,
+        };
         let production = MockProviders::default();
-        assert_eq!(local.submit("demo:fail-icp").unwrap_err().code, "ICP_DEMO_REJECTION");
+        assert_eq!(
+            local.submit("demo:fail-icp").unwrap_err().code,
+            "ICP_DEMO_REJECTION"
+        );
         assert!(local.provision("demo:fail-icp").is_ok());
         assert!(production.submit("demo:fail-icp").is_ok());
         assert!(local.submit("synthetic:ok").is_ok());

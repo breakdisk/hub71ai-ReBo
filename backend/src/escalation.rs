@@ -50,10 +50,7 @@ impl EscalationRouting {
             ("logistics", &routing.logistics),
         ] {
             let action = route.required_next_action.trim();
-            if action.is_empty()
-                || action.len() > 240
-                || action.chars().any(char::is_control)
-            {
+            if action.is_empty() || action.len() > 240 || action.chars().any(char::is_control) {
                 return Err(EscalationRoutingError::InvalidNextAction { stage });
             }
         }

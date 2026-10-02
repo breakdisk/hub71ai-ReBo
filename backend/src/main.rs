@@ -54,7 +54,9 @@ async fn shutdown_signal() {
 
     #[cfg(unix)]
     let terminate = async {
-        if let Ok(mut signal) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+        if let Ok(mut signal) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        {
             signal.recv().await;
         }
     };
@@ -75,7 +77,7 @@ mod tests {
     use super::ensure_loopback_bind;
 
     #[test]
-    fn unauthenticated_demo_only_binds_loopback_addresses() {
+    fn unauthenticated_demo_only_binds_loopback_by_default() {
         assert!(ensure_loopback_bind("127.0.0.1:8080".parse::<SocketAddr>().unwrap()).is_ok());
         assert!(ensure_loopback_bind("[::1]:8080".parse::<SocketAddr>().unwrap()).is_ok());
         assert!(ensure_loopback_bind("0.0.0.0:8080".parse::<SocketAddr>().unwrap()).is_err());

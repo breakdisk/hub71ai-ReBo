@@ -1,6 +1,16 @@
 # Agentic Global Mobility: safety and readiness roadmap
 
-This roadmap adds the five identified gaps to the product plan. The current repository remains a local simulation: no partner, government, tax, utility, community, or cloud-failover integrations are active. Any UI fixture is synthetic and must be labeled as a demo. A green prototype indicator must never imply a real service, legal determination, payment, booking, or home activation.
+This roadmap tracks the five identified gaps and the remaining work before production. The repository now wires guarded local prototype flows for each area; no partner, government, tax, utility, community, or cloud-failover integrations are active. Any UI fixture is synthetic and must be labeled as a demo. A green prototype indicator must never imply a real service, legal determination, payment, booking, or home activation.
+
+## Current local-prototype coverage
+
+- **Soft landing:** optional manual neighborhood guidance, dated cultural-learning placeholders, and session-only, user-selected community interests. Local content review is still pending; there is no GPS use, matchmaking, or external referral.
+- **Tax and gratuity:** consented, human-confirmed travel-day and salary-change evidence can be recorded. The ruleset is unavailable, so the system makes no tax-residency determination and shows no gratuity estimate.
+- **Human escalation:** local cases can be acknowledged and resolved with a typed outcome. Specialist assignment, acknowledgement deadlines, notifications, and government/PRO contact remain unconfigured.
+- **Home readiness:** lease-reference review and explicit human approval are recorded. Utility and smart-home providers remain blocked/unconfigured; no service request, charge, or remote command is sent.
+- **Resilience:** a tabletop review record can be stored. Regional inventory, failover, replicas, and measured RPO/RTO remain unknown.
+
+All API records remain in memory and reset on restart. These flows support product validation only; they are not production services.
 
 ## 1. Soft landing and cultural intelligence
 

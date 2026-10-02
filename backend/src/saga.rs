@@ -2,6 +2,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::{
+    escalation::EscalationRouting,
     model::{
         AuditRecord, CandidateSummary, CaseManagerEscalation, EscalationAuditDetails,
         EscalationStatus, ExceptionRecord, OnboardingRequest, OnboardingResponse, PipelineState,
@@ -11,7 +12,6 @@ use crate::{
         BankingProvider, IcpProvider, LogisticsProvider, MockProviders, ProviderError,
         ProviderStage, TravelProvider,
     },
-    escalation::EscalationRouting,
 };
 
 #[derive(Debug)]
@@ -20,6 +20,12 @@ pub struct SagaResult {
     pub summary: PipelineSummary,
     pub audits: Vec<AuditRecord>,
 }
+
+type ProviderStep = (
+    Stage,
+    &'static str,
+    fn(&MockProviders, &str) -> Result<(), ProviderError>,
+);
 
 /// Runs a sequential saga against provider ports. For this local prototype the
 /// only adapter is deterministic and mocked; opaque token data is never copied
@@ -47,8 +53,10 @@ pub fn run(
         PipelineState::Completed,
     )];
 
-    let providers = MockProviders { failure_tokens_enabled };
-    let steps: [(Stage, &str, fn(&MockProviders, &str) -> Result<(), ProviderError>); 4] = [
+    let providers = MockProviders {
+        failure_tokens_enabled,
+    };
+    let steps: [ProviderStep; 4] = [
         (Stage::Icp, "icp.submitted", |p, t| p.submit(t)),
         (Stage::Banking, "banking.provisioned", |p, t| p.provision(t)),
         (Stage::Travel, "travel.booked", |p, t| p.book(t)),
@@ -86,7 +94,7 @@ pub fn run(
                 audits.push(audit(
                     pipeline_id,
                     &format!("{}.failed", stage_name(&stage)),
-                    stage,
+                    stage.clone(),
                     PipelineState::Failed,
                 ));
                 let route = routing
@@ -101,6 +109,9 @@ pub fn run(
                     status: EscalationStatus::PendingHuman,
                     required_next_action: route.required_next_action.clone(),
                     created_at: Utc::now(),
+                    acknowledged_at: None,
+                    resolved_at: None,
+                    resolution_code: None,
                 };
                 audits.push(escalation_audit(pipeline_id, &escalation_record));
                 escalation = Some(escalation_record);
@@ -161,6 +172,7 @@ fn escalation_audit(pipeline_id: Uuid, escalation: &CaseManagerEscalation) -> Au
             owning_team: escalation.owning_team,
             status: escalation.status,
             required_next_action: escalation.required_next_action.clone(),
+            resolution_code: escalation.resolution_code,
         }),
     }
 }
@@ -191,9 +203,7 @@ fn stage_name(stage: &Stage) -> &'static str {
 
 fn failure_message(stage: ProviderStage) -> String {
     match stage {
-        ProviderStage::Icp => {
-            "Mock ICP provider rejected the synthetic identity token.".to_owned()
-        }
+        ProviderStage::Icp => "Mock ICP provider rejected the synthetic identity token.".to_owned(),
         ProviderStage::Banking => {
             "Mock banking provider rejected the synthetic identity token.".to_owned()
         }
@@ -205,5 +215,3 @@ fn failure_message(stage: ProviderStage) -> String {
         }
     }
 }
-
-\n

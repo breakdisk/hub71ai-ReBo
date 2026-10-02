@@ -84,6 +84,24 @@ pub enum SpecialistTeam {
 #[serde(rename_all = "snake_case")]
 pub enum EscalationStatus {
     PendingHuman,
+    Acknowledged,
+    Resolved,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EscalationResolutionCode {
+    EvidenceCorrected,
+    ProviderRecovered,
+    ApprovedManualResolution,
+    FalsePositive,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EscalationAction {
+    Acknowledge,
+    Resolve,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -105,6 +123,12 @@ pub struct CaseManagerEscalation {
     pub status: EscalationStatus,
     pub required_next_action: String,
     pub created_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acknowledged_at: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolved_at: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolution_code: Option<EscalationResolutionCode>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -115,6 +139,151 @@ pub struct EscalationAuditDetails {
     pub owning_team: SpecialistTeam,
     pub status: EscalationStatus,
     pub required_next_action: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolution_code: Option<EscalationResolutionCode>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EscalationActionRequest {
+    pub human_confirmed: bool,
+    pub action: EscalationAction,
+    pub resolution_code: Option<EscalationResolutionCode>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TravelDayKind {
+    Arrival,
+    Departure,
+    InCountryDay,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MobilityRulesetStatus {
+    pub configured: bool,
+    pub approved: bool,
+    pub version: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TravelDayEvidence {
+    pub id: Uuid,
+    pub date: String,
+    pub country: String,
+    pub kind: TravelDayKind,
+    pub human_confirmed: bool,
+    pub consent_accepted: bool,
+    pub recorded_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CreateTravelDayRequest {
+    pub date: String,
+    pub country: String,
+    pub kind: TravelDayKind,
+    pub human_confirmed: bool,
+    pub consent_accepted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SalaryChangeEvidence {
+    pub id: Uuid,
+    pub effective_date: String,
+    pub basic_salary: f64,
+    pub currency: String,
+    pub human_confirmed: bool,
+    pub recorded_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CreateSalaryChangeRequest {
+    pub effective_date: String,
+    pub basic_salary: f64,
+    pub currency: String,
+    pub human_confirmed: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MobilityResponse {
+    pub ruleset: MobilityRulesetStatus,
+    pub travel_days: Vec<TravelDayEvidence>,
+    pub salary_changes: Vec<SalaryChangeEvidence>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HomeReadinessRequest {
+    pub lease_reference: String,
+    pub lease_proof_reviewed: bool,
+    pub human_approved: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct HomeReadinessGate {
+    pub lease_reference: String,
+    pub lease_proof_reviewed: bool,
+    pub human_approved: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HomeUtilitiesStatus {
+    pub status: &'static str,
+    pub provider_status: &'static str,
+    pub reason: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HomeReadinessResponse {
+    pub lease_reference: Option<String>,
+    pub lease_proof_reviewed: bool,
+    pub human_approved: bool,
+    pub utilities: HomeUtilitiesStatus,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ResilienceReviewOutcome {
+    GapsIdentified,
+    NoKnownGaps,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CreateResilienceReviewRequest {
+    pub human_confirmed: bool,
+    pub reviewed_at: String,
+    pub outcome: ResilienceReviewOutcome,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ResilienceReviewEvidence {
+    pub id: Uuid,
+    pub reviewed_at: String,
+    pub outcome: ResilienceReviewOutcome,
+    pub evidence_type: &'static str,
+    pub failover_executed: bool,
+    pub recorded_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResilienceResponse {
+    pub status: &'static str,
+    pub rpo_minutes: Option<u64>,
+    pub rto_minutes: Option<u64>,
+    pub failover_configured: bool,
+    pub reviews: Vec<ResilienceReviewEvidence>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -182,5 +351,3 @@ pub struct ApiErrorDetail {
     pub code: &'static str,
     pub message: &'static str,
 }
-
-\n

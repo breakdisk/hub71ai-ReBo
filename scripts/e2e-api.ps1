@@ -87,7 +87,7 @@ try {
     $created = Invoke-Json -Method "POST" -Path "/api/onboarding" -Body $successBody -Headers @{ "Idempotency-Key" = $idempotencyKey }
     Assert-That ($created.Status -eq 201) "new onboarding returns HTTP 201"
     Assert-That ($created.Json.state -eq "completed" -and $created.Json.stage -eq "complete") "success saga completes all stages"
-    Assert-That ($created.Json.pipelineId) "success response contains a pipeline ID"
+    Assert-That (-not [string]::IsNullOrWhiteSpace([string]$created.Json.pipelineId)) "success response contains a pipeline ID"
     Assert-That (-not $created.Raw.Contains($successToken)) "identity token is not returned"
 
     $replay = Invoke-Json -Method "POST" -Path "/api/onboarding" -Body $successBody -Headers @{ "Idempotency-Key" = $idempotencyKey }
@@ -137,11 +137,70 @@ try {
     Assert-That (@($audit | Where-Object { $_.pipelineId -eq $failed.Json.pipelineId -and $_.action -eq "human_escalation.created" -and $_.escalation.owningTeam -eq "icp_case_management" }).Count -eq 1) "human routing choice is present in the audit trail"
     Assert-That (-not (ConvertTo-Json -InputObject $audit -Depth 8 -Compress).Contains($failureToken)) "audit trail does not expose identity tokens"
 
+    # Record travel evidence with explicit consent/confirmation. This is a day
+    # ledger only; it must never infer UAE or home-country tax residency.
+    $mobilityBefore = (Invoke-Json -Method "GET" -Path "/api/mobility" -Body $null).Json
+    Assert-That (-not $mobilityBefore.ruleset.configured -and -not $mobilityBefore.ruleset.approved -and $null -eq $mobilityBefore.ruleset.version) "tax/gratuity ruleset starts unavailable"
+    $travelDay = @{
+        date = (Get-Date -Format "yyyy-MM-dd")
+        country = "AE"
+        kind = "in_country_day"
+        humanConfirmed = $true
+        consentAccepted = $true
+    }
+    $travelRecorded = Invoke-Json -Method "POST" -Path "/api/mobility/travel-days" -Body $travelDay
+    Assert-That ($travelRecorded.Status -in @(200, 201)) "consented travel-day evidence is recorded"
+    $mobility = (Invoke-Json -Method "GET" -Path "/api/mobility" -Body $null).Json
+    Assert-That (@($mobility.travelDays | Where-Object { $_.date -eq $travelDay.date -and $_.country -eq "AE" -and $_.kind -eq "in_country_day" }).Count -eq 1) "travel-day evidence is visible in the mobility ledger"
+    Assert-That (-not $mobility.ruleset.configured -and $null -eq $mobility.gratuityEstimate -and $null -eq $mobility.residencyConclusion) "unreviewed rules do not yield a tax conclusion or gratuity amount"
+
+    $salaryChange = @{
+        effectiveDate = (Get-Date -Format "yyyy-MM-dd")
+        basicSalary = 25000
+        currency = "AED"
+        humanConfirmed = $true
+    }
+    $salaryRecorded = Invoke-Json -Method "POST" -Path "/api/mobility/salary-changes" -Body $salaryChange
+    Assert-That ($salaryRecorded.Status -in @(200, 201)) "confirmed synthetic basic-salary change is recorded"
+    $mobility = (Invoke-Json -Method "GET" -Path "/api/mobility" -Body $null).Json
+    Assert-That (@($mobility.salaryChanges | Where-Object { $_.effectiveDate -eq $salaryChange.effectiveDate -and $_.basicSalary -eq 25000 -and $_.currency -eq "AED" }).Count -eq 1) "salary evidence is visible in the ledger"
+    Assert-That ($null -eq $mobility.gratuityEstimate) "salary records do not display a gratuity estimate without an approved ruleset"
+
+    # Close the simulated case through two explicit human actions. The action
+    # is local bookkeeping; it never contacts ICP/GDRFA or a PRO.
+    $escalationId = $failed.Json.escalation.id
+    $acknowledged = Invoke-Json -Method "PATCH" -Path "/api/escalations/$escalationId" -Body @{ humanConfirmed = $true; action = "acknowledge" }
+    Assert-That ($acknowledged.Status -eq 200 -and $acknowledged.Json.status -eq "acknowledged") "specialist case acknowledgment is recorded"
+    $resolved = Invoke-Json -Method "PATCH" -Path "/api/escalations/$escalationId" -Body @{ humanConfirmed = $true; action = "resolve"; resolutionCode = "evidence_corrected" }
+    Assert-That ($resolved.Status -eq 200 -and $resolved.Json.status -eq "resolved") "case resolution requires a typed outcome"
+    $openCases = (Invoke-Json -Method "GET" -Path "/api/escalations" -Body $null).Json.items
+    Assert-That (@($openCases | Where-Object { $_.id -eq $escalationId -and $_.status -eq "resolved" }).Count -eq 1) "case lifecycle state is visible in the specialist queue"
+    $audit = (Invoke-Json -Method "GET" -Path "/api/audit" -Body $null).Json.items
+    Assert-That (@($audit | Where-Object { $_.pipelineId -eq $failed.Json.pipelineId -and $_.action -eq "human_escalation.acknowledged" }).Count -eq 1) "case acknowledgment is audited"
+    Assert-That (@($audit | Where-Object { $_.pipelineId -eq $failed.Json.pipelineId -and $_.action -eq "human_escalation.resolved" }).Count -eq 1) "case resolution is audited"
+
+    # Home readiness captures a reviewed lease reference and explicit approval,
+    # while correctly blocking utility/IoT actions because adapters are absent.
+    $homeBefore = (Invoke-Json -Method "GET" -Path "/api/home-readiness" -Body $null).Json
+    Assert-That ($homeBefore.utilities.status -eq "blocked" -and $homeBefore.utilities.providerStatus -eq "unconfigured") "utilities stay blocked until a real provider adapter is configured"
+    $homeRequest = Invoke-Json -Method "POST" -Path "/api/home-readiness" -Body @{ leaseReference = "synthetic:lease-$suffix"; leaseProofReviewed = $true; humanApproved = $true }
+    Assert-That ($homeRequest.Status -in @(200, 201) -and $homeRequest.Json.leaseProofReviewed -and $homeRequest.Json.humanApproved) "lease review and resident approval are recorded"
+    Assert-That ($homeRequest.Json.utilities.status -eq "blocked" -and $homeRequest.Json.utilities.providerStatus -eq "unconfigured") "recorded approval does not activate utilities or smart-home controls"
+
+    # A tabletop review is evidence of discussion only. It cannot set recovery
+    # objectives or claim a completed failover.
+    $resilienceBefore = (Invoke-Json -Method "GET" -Path "/api/resilience" -Body $null).Json
+    Assert-That ($resilienceBefore.status -eq "unknown" -and -not $resilienceBefore.failoverConfigured -and $null -eq $resilienceBefore.rpoMinutes -and $null -eq $resilienceBefore.rtoMinutes) "regional recovery remains unconfigured and unmeasured"
+    $review = Invoke-Json -Method "POST" -Path "/api/resilience/reviews" -Body @{ humanConfirmed = $true; reviewedAt = (Get-Date -Format "yyyy-MM-dd"); outcome = "gaps_identified" }
+    Assert-That ($review.Status -in @(200, 201) -and $review.Json.evidenceType -eq "tabletop_only" -and -not $review.Json.failoverExecuted) "resilience review is stored as tabletop-only evidence"
+    $resilience = (Invoke-Json -Method "GET" -Path "/api/resilience" -Body $null).Json
+    Assert-That ($resilience.status -eq "unknown" -and -not $resilience.failoverConfigured -and $null -eq $resilience.rpoMinutes -and $null -eq $resilience.rtoMinutes) "tabletop review does not claim measured recovery or failover"
+
     $finalStatus = (Invoke-Json -Method "GET" -Path "/api/status" -Body $null).Json
     Assert-That ($finalStatus.pipelineCount -ge ($initialStatus.pipelineCount + 2)) "status counts both new pipelines"
     Assert-That ($finalStatus.exceptionCount -ge ($initialStatus.exceptionCount + 1)) "status counts the mock exception"
 
-    Write-Output "PASS: API end-to-end smoke checks (success saga, idempotency, validation, conflict, ICP exception, human escalation, SSE, audit, token privacy)"
+    Write-Output "PASS: API end-to-end checks (onboarding, idempotency, typed case lifecycle, consented travel/salary evidence, guarded home readiness, tabletop-only resilience, SSE, audit, identity privacy)"
 }
 finally {
     $eventReader.Dispose()

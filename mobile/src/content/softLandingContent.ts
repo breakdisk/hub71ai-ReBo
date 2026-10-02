@@ -3,8 +3,22 @@ export type StaticGuideItem = {
   body: string;
 };
 
-export const SOFT_LANDING_REVIEW_NOTICE =
-  'PROTOTYPE CONTENT · FOR LOCAL REVIEW BEFORE RELEASE';
+export type NeighborhoodGuide = {
+  id: string;
+  name: string;
+  tips: readonly StaticGuideItem[];
+};
+
+export type CqMicroLesson = {
+  title: string;
+  situation: string;
+  practice: string;
+  reflection: string;
+};
+
+export const SOFT_LANDING_REVIEW_NOTICE = 'PROTOTYPE GUIDANCE · LOCAL REVIEW PENDING';
+export const CONTENT_REVIEW_DATE = 'Not set';
+export const NEIGHBORHOOD_PRIVACY_NOTICE = 'No GPS or device location is used. Area tips are static prompts, not directions or live recommendations.';
 
 export const ARRIVAL_GUIDE_ACTION = 'Open the optional arrival guide';
 export const ARRIVAL_GUIDE: readonly StaticGuideItem[] = [
@@ -22,40 +36,99 @@ export const ARRIVAL_GUIDE: readonly StaticGuideItem[] = [
   },
 ];
 
-export const WORKPLACE_ETIQUETTE: readonly StaticGuideItem[] = [
+/**
+ * Static, manually selected neighborhood prompts. They intentionally avoid
+ * live venue recommendations, directions, location access, and service claims.
+ */
+export const NEIGHBORHOOD_GUIDES: readonly NeighborhoodGuide[] = [
   {
-    title: 'Start with respect and curiosity',
-    body: 'Use the name or title your colleague prefers. Let the other person set the pace for greetings and personal space; customs vary by person and situation.',
+    id: 'dubai-marina',
+    name: 'Dubai Marina',
+    tips: [
+      { title: 'Confirm your building entrance', body: 'Ask your host which entrance and pickup point to use, especially if a building has more than one access point.' },
+      { title: 'Check transport on the day', body: 'If you plan to use public transport, check current routes and service information through official transit channels before leaving.' },
+    ],
   },
   {
-    title: 'Make meetings easy to follow',
-    body: 'Aim to arrive on time, listen closely, and confirm owners and next steps. If a decision or process is unclear, ask how your team prefers to handle it.',
+    id: 'downtown-dubai',
+    name: 'Downtown Dubai',
+    tips: [
+      { title: 'Agree on a meeting point', body: 'Confirm the building entrance or meeting point with your host so you can find one another without sharing your live location.' },
+      { title: 'Check transport on the day', body: 'Check current routes, access, and service information through official transit channels before travelling.' },
+    ],
   },
   {
-    title: 'Check your team’s norms',
-    body: 'Ask your employer about dress expectations and client-site practices. During Ramadan or other observances, check with colleagues about schedules rather than making assumptions.',
+    id: 'jumeirah-lakes-towers',
+    name: 'Jumeirah Lakes Towers',
+    tips: [
+      { title: 'Confirm the tower and pickup point', body: 'Ask your host to confirm the exact tower or building name and agreed pickup point before arranging a visit.' },
+      { title: 'Check transport on the day', body: 'Check current routes and service information through official transit channels before leaving.' },
+    ],
+  },
+  {
+    id: 'abu-dhabi-corniche',
+    name: 'Abu Dhabi Corniche',
+    tips: [
+      { title: 'Ask about visitor access', body: 'Check with your accommodation host about the entrance and any visitor access steps for your building.' },
+      { title: 'Check transport on the day', body: 'Check current local routes and service information through official transit channels before travelling.' },
+    ],
   },
 ];
 
-export const WORKPLACE_CONTEXT_NOTE =
-  'The UAE is diverse. These are conversation starters, not rules for every person or workplace.';
+export const CQ_MICRO_LESSONS: readonly CqMicroLesson[] = [
+  {
+    title: 'Names, greetings, and personal space',
+    situation: 'You are meeting a colleague or neighbor for the first time.',
+    practice: 'Use the name or title they share, follow their lead on greetings, and give them room to set a comfortable pace.',
+    reflection: 'What could you ask if you are unsure how someone prefers to be addressed?',
+  },
+  {
+    title: 'Clear, respectful communication',
+    situation: 'A meeting ends with an unclear decision or next step.',
+    practice: 'Summarize what you heard and ask who owns the next step and when to check back. Team preferences can differ.',
+    reflection: 'How would you check your own understanding without assuming everyone communicates the same way?',
+  },
+  {
+    title: 'Schedules and observances',
+    situation: 'You are planning a meeting or deadline around a holiday or observance.',
+    practice: 'Ask about availability and working arrangements directly. Avoid assuming that one schedule or practice applies to everyone.',
+    reflection: 'What open-ended question could help you plan inclusively?',
+  },
+];
 
-export const COMMUNITY_OPT_IN_ACTION = 'I choose to explore family & community options';
-export const COMMUNITY_DIRECTORY_PLACEHOLDER = {
-  title: 'Optional directory & referral service',
-  body: 'This is a local prototype placeholder; no directory, referrals, or matching are active. Choosing to view this note does not create a profile or contact anyone. No family details or interests are collected or sent.',
-  nextStep: 'A future service could offer a directory or a human referral only after a separate, informed choice.',
-} as const;
+export const CQ_CONTEXT_NOTE =
+  'The UAE is diverse. These short prompts are conversation practice, not rules about how any person or workplace will behave.';
+
+export const COMMUNITY_INTEREST_CATEGORIES = [
+  { id: 'professional-networking', label: 'Professional networking' },
+  { id: 'sports-outdoors', label: 'Sports and outdoors' },
+  { id: 'arts-culture', label: 'Arts and culture' },
+  { id: 'language-exchange', label: 'Language exchange' },
+  { id: 'volunteering', label: 'Volunteering' },
+  { id: 'neighborhood-events', label: 'Neighborhood events' },
+] as const;
+
+export type CommunityInterestCategory = (typeof COMMUNITY_INTEREST_CATEGORIES)[number]['id'];
+
+export const COMMUNITY_PRIVACY_NOTICE =
+  'Choose broad topics only. If you explicitly consent, your selected categories are kept in this screen’s memory for this session. They are not sent to an employer, directory, or other person. No directory, referral, or matching service is active. The app does not ask for family, child, or contact details.';
+export const COMMUNITY_CHOOSE_ACTION = 'Choose community topics';
+export const COMMUNITY_CONSENT_ACTION = 'I consent: keep these topics for this session';
+export const COMMUNITY_WITHDRAW_ACTION = 'Withdraw consent and delete interests';
 
 export function contentHasExternalLinks(): boolean {
   const strings = [
     SOFT_LANDING_REVIEW_NOTICE,
-    ARRIVAL_GUIDE_ACTION,
-    WORKPLACE_CONTEXT_NOTE,
-    COMMUNITY_OPT_IN_ACTION,
+    NEIGHBORHOOD_PRIVACY_NOTICE,
     ...ARRIVAL_GUIDE.flatMap(({ title, body }) => [title, body]),
-    ...WORKPLACE_ETIQUETTE.flatMap(({ title, body }) => [title, body]),
-    ...Object.values(COMMUNITY_DIRECTORY_PLACEHOLDER),
+    ...NEIGHBORHOOD_GUIDES.flatMap(({ name, tips }) => [name, ...tips.flatMap(({ title, body }) => [title, body])]),
+    ...CQ_MICRO_LESSONS.flatMap(({ title, situation, practice, reflection }) => [title, situation, practice, reflection]),
+    CQ_CONTEXT_NOTE,
+    COMMUNITY_PRIVACY_NOTICE,
+    COMMUNITY_CHOOSE_ACTION,
+    COMMUNITY_CONSENT_ACTION,
+    COMMUNITY_WITHDRAW_ACTION,
+    ...COMMUNITY_INTEREST_CATEGORIES.map(({ label }) => label),
   ];
   return strings.some((text) => /https?:\/\//i.test(text));
 }

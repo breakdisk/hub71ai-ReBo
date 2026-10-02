@@ -113,5 +113,3 @@ test('only accepts synthetic token references as sync credentials', async () => 
   assert.equal(submitted, false);
   assert.equal(outbox.attention, 'identity_token_missing');
 });
-
-\n
