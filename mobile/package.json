@@ -21,11 +21,11 @@
     "expo-network": "~57.0.2",
     "expo-secure-store": "~57.0.4",
     "expo-sqlite": "~57.0.3",
-    "react": "19.2.3",
+    "react": "19.3.0",
     "react-native": "0.86.3"
   },
   "devDependencies": {
-    "@types/react": "~19.2.0",
+    "@types/react": "~19.3.0",
     "typescript": "~6.0.3"
   }
 }
